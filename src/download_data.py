@@ -1,6 +1,12 @@
 from pandas import Series, DataFrame
 import requests, re, json, pandas as pd, numpy as np
 
+# =========
+# = Usage =
+# =========
+
+# python download_data.py
+
 # ====================================
 # = Function for retrieving the info =
 # ====================================
@@ -39,27 +45,36 @@ def get_answers_df(url_answers):
   answers_out = pd.merge(answers_out, q_id_text_df, on = "question_id")
   return answers_out
 
-# =============
-# = Build URL =
-# =============
+def main():
+  args = sys.argv[1:]
 
-base = "https://api.stackexchange.com/2.1/"
-dataset = "questions?"
-pagesize = "pagesize=100"
-page = "page=1"
-dates = "fromdate=1359676800&todate=1362009600"
-site = "site=stackoverflow"
-#filtro_answers = "filter=!*1KcrsKf*fZmPVv*IfOQ)42cD*T._42A2LlO7-_S."
-filtro_answers = "filter=!OduD9Oq(n969EztJer8LsVbnB38.3hU.m.L-3u*5IlF"
-answers_list = []
-for k in range(100):
-  print "Retrieving page " + str(k + 1)
-  url_answers = base + dataset + "&".join(["page=" + str(k + 1),
-    pagesize, dates, site, filtro_answers])
-  answers_list.append(get_answers_df(url_answers))
+  if not args:
+    print 'usage: python download_data.py ouput_path.csv '
+    sys.exit(1)
+  ouput_path = args[0]
+  no_pages = args[1]
 
+  # =============
+  # = Build URL =
+  # =============
 
-answers = pd.concat(answers_list)
-answers = answers.set_index("question_id")
+  base = "https://api.stackexchange.com/2.1/"
+  dataset = "questions?"
+  pagesize = "pagesize=100"
+  page = "page=1"
+  dates = "fromdate=1359676800&todate=1362009600"
+  site = "site=stackoverflow"
+  filtro_answers = "filter=!OduD9Oq(n969EztJer8LsVbnB38.3hU.m.L-3u*5IlF"
+  answers_list = []
+  for k in range(no_pages):
+    print "Retrieving page " + str(k + 1)
+    url_answers = base + dataset + "&".join(["page=" + str(k + 1),
+      pagesize, dates, site, filtro_answers])
+    answers_list.append(get_answers_df(url_answers))
 
-answers.to_csv("score_df.csv", encoding = "UTF-8")
+  answers = pd.concat(answers_list)
+  answers = answers.set_index("question_id")
+
+  answers.to_csv(output_path, encoding = "UTF-8")
+if __name__ == '__main__':
+  main()
