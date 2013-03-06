@@ -1,11 +1,11 @@
 from pandas import Series, DataFrame
-import requests, re, json, pandas as pd, numpy as np
+import requests, re, json, pandas as pd, numpy as np, sys, time
 
 # =========
 # = Usage =
 # =========
 
-# python download_data.py
+# python download_data.py output_path.csv number_of_pages_to_retrive
 
 # ====================================
 # = Function for retrieving the info =
@@ -15,7 +15,12 @@ def get_answers_df(url_answers):
   a_to_q_json = requests.get(url_answers).json()
   q_ids = []
   frames = []
-  q_id_text = {}
+  q_id_text = {}  
+  if "backoff" in a_to_q_json.keys():
+    print a_to_q_json.keys()
+    print "Backoff!!"
+    print a_to_q_json["backoff"]
+    time.sleep(a_to_q_json["backoff"])
   for q in a_to_q_json["items"]:
     q_id_text[q["question_id"]] = q["body"]
     q_ids.append(q["question_id"])
@@ -49,10 +54,10 @@ def main():
   args = sys.argv[1:]
 
   if not args:
-    print 'usage: python download_data.py ouput_path.csv '
+    print 'usage: python download_data.py output_path.csv number_of_pages_to_retrive '
     sys.exit(1)
-  ouput_path = args[0]
-  no_pages = args[1]
+  output_path = args[0]
+  no_pages = int(args[1])
 
   # =============
   # = Build URL =
@@ -64,7 +69,8 @@ def main():
   page = "page=1"
   dates = "fromdate=1359676800&todate=1362009600"
   site = "site=stackoverflow"
-  filtro_answers = "filter=!OduD9Oq(n969EztJer8LsVbnB38.3hU.m.L-3u*5IlF"
+  #filtro_answers = "filter=!OduD9Oq(n969EztJer8LsVbnB38.3hU.m.L-3u*5IlF"
+  filtro_answers = "filter=!OduD9Oq(n969EztJer8LsVbnB37eBzIQhx3SxXjIr8k"
   answers_list = []
   for k in range(no_pages):
     print "Retrieving page " + str(k + 1)
