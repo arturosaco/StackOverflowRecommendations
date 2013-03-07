@@ -16,17 +16,19 @@ def get_answers_df(url_answers):
   q_ids = []
   frames = []
   q_id_text = {}  
+  
+  print a_to_q_json.keys()
+  
   if "backoff" in a_to_q_json.keys():
-    print a_to_q_json.keys()
-    print "Backoff!!"
-    print a_to_q_json["backoff"]
+    print "Backoff for" + str(a_to_q_json["backoff"]) + " seconds"
     time.sleep(a_to_q_json["backoff"])
+
   for q in a_to_q_json["items"]:
-    q_id_text[q["question_id"]] = q["body"]
-    q_ids.append(q["question_id"])
-    a_ids = []
-    frames_2 = []
     if "answers" in q.keys():
+      q_id_text[q["question_id"]] = q["body"]
+      q_ids.append(q["question_id"])    
+      a_ids = []
+      frames_2 = []
       for answer in q["answers"]:
         a_ids.append(answer["answer_id"])    
         frames_2.append(DataFrame.from_dict(answer, orient = "index").transpose())
@@ -70,7 +72,7 @@ def main():
   dates = "fromdate=1359676800&todate=1362009600"
   site = "site=stackoverflow"
   #filtro_answers = "filter=!OduD9Oq(n969EztJer8LsVbnB38.3hU.m.L-3u*5IlF"
-  filtro_answers = "filter=!OduD9Oq(n969EztJer8LsVbnB37eBzIQhx3SxXjIr8k"
+  filtro_answers = "filter=!17YvvVMnKqQnZ(4tvXc6y-t7GOxx.voHqEUOcSrH7cbbn7"
   answers_list = []
   for k in range(no_pages):
     print "Retrieving page " + str(k + 1)
@@ -82,5 +84,6 @@ def main():
   answers = answers.set_index("question_id")
 
   answers.to_csv(output_path, encoding = "UTF-8")
+
 if __name__ == '__main__':
   main()
