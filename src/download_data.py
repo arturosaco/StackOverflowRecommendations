@@ -24,8 +24,12 @@ def get_answers_df(url_answers):
   q_id_text = {}
   q_id_date = {}  
   
-  print a_to_q_json.keys()
-  
+  print "HasMore:" + str(a_to_q_json["has_more"])
+  print "QuotaRemaining:" + str(a_to_q_json["quota_remaining"])
+  print "Total: " + str(a_to_q_json["total"])
+  print "Page:" + str(a_to_q_json["page"])
+  print ""
+
   if "backoff" in a_to_q_json.keys():
     print "Backoff for" + str(a_to_q_json["backoff"]) + " seconds"
     #time.sleep(a_to_q_json["backoff"])
@@ -73,7 +77,7 @@ def main():
   args = sys.argv[1:]
 
   if not args:
-    print 'usage: python download_data.py output_path.csv number_of_pages_to_retrive '
+    print 'usage: python download_data.py output_path.csv number_of_pages_to_retrive page_ini'
     sys.exit(1)
   output_path = args[0]
   no_pages = int(args[1])
@@ -85,7 +89,7 @@ def main():
   base = "https://api.stackexchange.com/2.1/"
   dataset = "questions?"
   pagesize = "pagesize=100"
-  page = "page=1"
+  page = "page=" + args[2]
   dates = "fromdate=1359676800&todate=1362009600"
   site = "site=stackoverflow"
   order = "order=asc"
@@ -95,7 +99,7 @@ def main():
   filtro_answers = "filter=!OduD9Ow1h(GaiYDK40EJH_uudJem98vpg3gGIx53ab7"
   answers_list = []
   for k in range(no_pages):
-    if (k%2) == 0:
+    if (k%2) == 1:
     #if (k%2) == 1:
       print "Retrieving page " + str(k + 1)
       url_answers = base + dataset + "&".join(["page=" + str(k + 1),
