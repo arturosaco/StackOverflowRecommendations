@@ -89,7 +89,6 @@ def main():
   base = "https://api.stackexchange.com/2.1/"
   dataset = "questions?"
   pagesize = "pagesize=100"
-  page = "page=" + args[2]
   dates = "fromdate=1359676800&todate=1362009600"
   site = "site=stackoverflow"
   order = "order=asc"
@@ -98,13 +97,13 @@ def main():
   #filtro_answers = "filter=!17YvvVMnKqQnZ(4tvXc6y-t7GOxx.voHqEUOcSrH7cbbn7"
   filtro_answers = "filter=!OduD9Ow1h(GaiYDK40EJH_uudJem98vpg3gGIx53ab7"
   answers_list = []
-  for k in range(no_pages):
-    if (k%2) == 1:
+  for k in range(int(args[2]) - 1, int(args[2]) - 1 + no_pages):
     #if (k%2) == 1:
-      print "Retrieving page " + str(k + 1)
-      url_answers = base + dataset + "&".join(["page=" + str(k + 1),
-        pagesize, dates, site, order, sort, filtro_answers])
-      answers_list.append(get_answers_df(url_answers))
+    #if (k%2) == 1:
+    print "Retrieving page " + str(k + 1)
+    url_answers = base + dataset + "&".join(["page=" + str(k + 1),
+      pagesize, dates, site, order, sort, filtro_answers])
+    answers_list.append(get_answers_df(url_answers))
 
   answers = pd.concat(answers_list)
   answers = answers.set_index("question_id")
