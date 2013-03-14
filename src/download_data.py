@@ -31,8 +31,8 @@ def get_answers_df(url_answers):
   print ""
 
   if "backoff" in a_to_q_json.keys():
-    print "Backoff for" + str(a_to_q_json["backoff"]) + " seconds"
-    #time.sleep(a_to_q_json["backoff"])
+    print "Backoff for " + str(a_to_q_json["backoff"]) + " seconds"
+    time.sleep(a_to_q_json["backoff"])
   
   #time.sleep(0.1)
 
@@ -99,11 +99,11 @@ def main():
   answers_list = []
   for k in range(int(args[2]) - 1, int(args[2]) - 1 + no_pages):
     #if (k%2) == 1:
-    #if (k%2) == 1:
-    print "Retrieving page " + str(k + 1)
-    url_answers = base + dataset + "&".join(["page=" + str(k + 1),
-      pagesize, dates, site, order, sort, filtro_answers])
-    answers_list.append(get_answers_df(url_answers))
+    if (k%2) == 0:
+      print "Retrieving page " + str(k + 1)
+      url_answers = base + dataset + "&".join(["page=" + str(k + 1),
+        pagesize, dates, site, order, sort, filtro_answers])
+      answers_list.append(get_answers_df(url_answers))
 
   answers = pd.concat(answers_list)
   answers = answers.set_index("question_id")
