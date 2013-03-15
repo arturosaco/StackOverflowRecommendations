@@ -14,14 +14,14 @@ def main():
     print 'flag = 1 for writing the score matrix, 0 otherwise'
     sys.exit(1)
   output_path = str(args[1]) + '/'
-  path_to_data.csv = str(args[2])
+  path_to_data_csv = str(args[2])
   flag = int(args[0])
 
   # ================
   # = score matrix =
   # ================
   
-  data = pd.read_csv(path_to_data.csv)
+  data = pd.read_csv(path_to_data_csv)
   data = data.set_index(["question_id", "answer_id"])
   if(flag == 1):
     mat = data["score"].unstack()
