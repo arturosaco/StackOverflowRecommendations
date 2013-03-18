@@ -1,7 +1,13 @@
 library(ProjectTemplate)
 load.project()
 
-scores <- read.csv("data/1_100.csv")
+scores.partial <- read.csv("data/1_500.csv")
+scores.partial.1 <- read.csv("data/501_1000.csv")
+scores.partial.2 <- read.csv("data/1001_1500.csv")
+
+scores <- rbind(scores.partial, scores.partial.1, scores.partial.2)
+rm(scores.partial, scores.partial.1, scores.partial.2)
+
 scores$answer_body <- as.character(scores$answer_body)
 scores$question_body <- as.character(scores$question_body)
 
@@ -73,27 +79,45 @@ round(prop.table(table(scores.2$answer.has.code)) * 100)
 
 round(prop.table(table(scores.2$is_accepted, scores.2$answer.has.code), 1) * 100)
 
-
-
-dcast(ddply(scores, "is_accepted", function(sub){
-    aux <- summary(nchar(sub$answer_body))
-    data.frame(q = names(aux), v = as.numeric(as.character(aux)))
-  }), q ~ is_accepted, value.var = "v")
-
-txt <- htmlParse(scores[1:3, "question_body"], asText = TRUE)
-plain.text <- paste(xpathSApply(txt, "//p", xmlValue), collapse = " ")
-code <- paste(xpathSApply(txt, "//pre", xmlValue), collapse = " ")
-
-
-
-
 # scores$X <- NULL
 
 prop.table(table(scores$is_accepted)) * 100
 
-ids <- scores[scores$answer_id %in%
-  names(table(scores$answer_id)[table(scores$answer_id) >1]), "question_id"]
+# ===================
+# = Recommendations =
+# ===================
 
-scores[scores$question_id %in% ids, ]
+### take a random subset of 10,000 questions
 
-texto <- paste(scores$question_body[1:15], collapse = " ")
+sub.q.ids <- sample(scores$question_id, 10000)
+scores.sub <- scores[!is.na(scores$answer_owner) & scores$question_id %in%
+  sub.q.ids, 
+   c("question_id", "answer_owner", "is_accepted")]
+
+# ====================
+# = Split train/test =
+# ====================
+
+q.ids <- unique(scores.sub$question_id)
+u.ids <- unique(scores.sub$answer_owner)
+
+train.q.ids <- sample(q.ids, round(2/3 * length(q.ids)))
+test.q.ids <- setdiff(q.ids, train.q.ids)
+
+scores.sub$answer_owner <- factor(scores.sub$answer_owner)
+scores.sub$question_id <- factor(scores.sub$question_id)
+
+scores.sub$id <- paste(scores.sub$question_id, scores.sub$answer_owner, sep = ".")
+scores.sub$is_accepted <- as.character(scores.sub$is_accepted)
+scores.sub[!is.na(scores.sub$is_accepted) & 
+  scores.sub$is_accepted == "False", "is_accepted"] <- 1
+scores.sub[!is.na(scores.sub$is_accepted) & 
+  scores.sub$is_accepted == "True", "is_accepted"] <- 2
+scores.sub$is_accepted <- as.numeric(scores.sub$is_accepted)
+scores.sub.1 <- scores.sub[!scores.sub$id %in% 
+  names(table(scores.sub$id)[table(scores.sub$id) > 1]), ]
+
+scores.mat <- acast(scores.sub.1, question_id ~ answer_owner, 
+  value.var = "is_accepted", fill = 0)
+
+library(recommenderlab)
