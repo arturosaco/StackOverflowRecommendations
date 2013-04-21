@@ -30,7 +30,15 @@ data$score <- as.numeric(as.character(data$score))
 data$answer_owner <- as.numeric(as.character(data$answer_owner))
 
 data <- data[!is.na(data$answer_owner),]
-
+data$is_accepted <- as.character(data$is_accepted)
+# d_ply(data, "question_id", function(sub){
+#   if("True" %in% sub$is_accepted){
+#     out <- sub[sub$is_accepted == "True", ]  
+#   }else{
+#     out <- sub[order(sub$score, decreasing = TRUE), ][1, ]
+#   }
+#   writeFileQuestion(out)
+#   }, .progress = "text")
 
 # for ( i in 1:nrow(data) ) {
 # 	if ( as.character(data$is_accepted[i]) == "True" ) {
@@ -58,13 +66,14 @@ matrix.1 <- ddply(matrix, c("userID", "itemID"), summarise,
 
 matrix.1 <- arrange(matrix.1, itemID)
 
+set.seed(104742)
 itemID.test <- sample(unique(matrix.1$itemID), 
   round(length(unique(matrix.1$itemID)) * .2))
 
 matrix.sub <- matrix.1[matrix.1$itemID %in% itemID.test, ]
 
-userID.test <- sample(unique(matrix.sub$userID), 
-  round(length(unique(matrix.sub$userID)) * .1))
+userID.test <- sample(unique(matrix.1$userID), 
+  round(length(unique(matrix.1$userID)) * .1))
 
 matrix.test <- matrix.sub[matrix.sub$userID %in% userID.test, ]
 
@@ -77,10 +86,12 @@ write.table(userID.test, file = "data/userID_test.txt")
 write.table(setdiff(matrix.1$itemID, itemID.test), file = "data/itemID_train.txt")
 write.table(setdiff(matrix.1$userID, userID.test), file = "data/userID_train.txt")
 
-write.table(matrix.1[matrix.1$itemID %in% itemID.test, ],
- file = "data/matrix_train.txt")
-write.table(matrix.1[matrix.1$userID %in% userID.test, ],
+write.table(matrix.1[matrix.1$itemID %in% itemID.test & 
+  matrix.1$userID %in% userID.test, ],
  file = "data/matrix_test.txt")
+write.table(matrix.1[!(matrix.1$itemID %in% itemID.test & 
+  matrix.1$userID %in% userID.test), ],
+ file = "data/matrix_train.txt")
 
 
 random <- runif(nrow(matrix))

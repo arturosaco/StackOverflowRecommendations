@@ -1,0 +1,56 @@
+Pipeline to download and generate input data:
+  * code/download_data.py data/scores-1.csv data/texts-1.csv 1000
+      (repeat for successive scores & texts file until finished)
+  * code/combine_score_files.py workfiles/scores.csv data/scores-*.csv
+  * code/combine_text_files.py workfiles/texts.csv data/texts-*.csv
+  * code/aggregate_scores.py workfiles/scores.csv workfiles/aggregated.csv
+  * cd output
+  * ../code/process_scores.py ../workfiles/aggregated.csv ../workfiles/texts.csv <question-test-proportion> <user-test-proportion>
+  * ../code/process_texts.py ../workfiles/texts.csv
+  * cd ..
+  * code/GenerateStopList.sh
+      (This extends the base stop list, in `reference/en.txt',
+	with the extremely rare and extremely common words in the input data.
+	The resulting stop list is `workfiles/stoplist.txt'.)
+  * code/ImportDirs.sh
+
+Note:
+  * Before you can use GenerateStopList.sh or ImportDirs.sh, you need to add the code/uk.me.conradscott/*.java files to mallet along with a copy of the snowball library (http://snowball.tartarus.org/dist/libstemmer_java.tgz), then rebuild mallet.
+
+Then, to run LDA:
+  * code/DoAllTraining.sh <num-topics>
+
+After this, the required files are in the `output' directory.
+
+NOTE: All csv files have a header, text files do not have a header.
+
+Directory contents:
+  * code
+      All python, R, and shell scripts
+    * uk.me.conradscott
+	Directory of Java code to add to mallet
+  * data
+      Raw downloaded data: scores-*.csv, texts-*.csv
+  * output (where TTT = <num-topics>):
+    * doc-topic-weights.{test, train}.TTT.csv
+	Dense csv files of question ids against topics, giving probabilities
+    * topic-word-weights.TTT.csv
+	Sparse csv files of topics against words, giving probabilities and counts
+    * topic-keys.TTT.csv
+	Text files of topics against words
+    * {itemID,userID}_{test,train}.txt
+	Text files of ids in test, training splits
+    * matrix.csv (the `score matrix')
+	Sparse csv file of question id against user id, giving scores
+    * matrix_{test,train}.csv
+	Test and training splits of the score matrix
+  * reference
+      Fixed input files
+    * en.txt: base stop list, extended by GenerateStopList.py
+  * test, train
+      Directories of test and training documents
+      Test ones are <title> + <question body>
+      Training ones are <title> + <question body> + <best answer body>
+  * workfiles
+      Various files created by the scripts and used for further processing
+      Generally not fit for direct human consumption

@@ -26,25 +26,27 @@ library(getopt)
 # Change this accordingly
 # The path should be to the sparse topics weights
 
-# topic.wiegths.path <- "data/OneMonthOfThree/SparseTopicWeights/top-n-doc-topic-weights.train.250.csv"
-# score.matrix.path <- "data/OneMonthOfThree/matrix.csv"
-# output.path <- "data/test.csv"
+topic.wiegths.path <- "../data/OneMonthOfThree/SparseTopicWeights/top-n-doc-topic-weights.train.550.csv"
+score.matrix.path <- "../data/OneMonthOfThree/matrix.csv"
+# output.path <- "../data/Recs/50_1.6_1.6_0.25_250.csv"
 
 # ======================================
 # = Read options from the command line =
 # ======================================
 
-spec <- matrix(c('TWP', 'tw', "a", "character",
-  'SMP', 'sm', "a", "character",
-  'OP', 'o', "a", "character"
-  ), byrow=TRUE, ncol = 4)
-opt <- getopt(spec)
+# spec <- matrix(c('TWP', 'tw', "a", "character",
+#   'SMP', 'sm', "a", "character",
+#   'OP', 'o', "a", "character"
+#   ), byrow=TRUE, ncol = 4)
+# opt <- getopt(spec)
 
-topic.wiegths.path <- opt$TWP
-score.matrix.path <- opt$SMP
-output.path <- opt$OP
+# topic.wiegths.path <- opt$TWP
+# score.matrix.path <- opt$SMP
+# output.path <- opt$OP
 
 
+### compute_user_features.R script is assumed to be on the same folder as 
+### this script
 source("compute_user_features.R", echo = TRUE)
 
 generalized.which.max <- function(x, n){
@@ -68,14 +70,14 @@ meltish <- function(mat){
 # ==================
 
 q.topic.test <- read.csv(file = 
-  "../data/OneMonthOfThree/doc-topic-weights.test.250.csv")
+  "../data/OneMonthOfThree/doc-topic-weights.test.550.csv")
 ids.test <- q.topic.test[,"question_id"]
 
 # ===============
 # = Read alphas =
 # ===============
 
-con <- file("../data/OneMonthOfThree/topic-keys.250.txt") 
+con <- file("../data/OneMonthOfThree/topic-keys.550.txt") 
 open(con)
 results.list <- list();
 current.line <- 1
@@ -95,6 +97,9 @@ alphas[,"alpha"] <- as.numeric(as.character(alphas[,"alpha"]))
 # ===============
 
 user.topic.mat <- as.matrix(user.topic.mat)
+neg.ind <- user.topic.mat < 0 
+user.topic.mat[neg.ind] <- 0
+
 q.topic.test.mat <- as.matrix(q.topic.test[, -1])
 rm(q.topic.test)
 alpha.aux <- as.numeric(alphas[,2])
@@ -103,22 +108,18 @@ avdl <- mean(apply(user.topic.mat, 1, sum))
 ### BM25 scores
 
 RecsBM25 <- function(k1, k3, b, n.recs, ids){    
-  term.1 <- ((k1 + 1) * user.topic.mat) / 
-    ((k1 * (1 - b) + b * (apply(user.topic.mat, 1, sum) / avdl)) +
-       user.topic.mat)
-  term.2 <- apply((((k3 + 1) *  q.topic.test.mat) / 
-      (k3 + q.topic.test.mat)), 1, function(x) x * alpha.aux)
+   term.1 <- (k1 + 1) * user.topic.mat /
+    (k1 * ((1 - b) + b * apply(user.topic.mat, 1, sum) / avdl) + user.topic.mat)
+
+  term.2 <- apply( (k3 + 1) *  q.topic.test.mat / (k3 + q.topic.test.mat),
+                   1, function(x) x * -log(alpha.aux) )
   term.1 <- as.big.matrix(term.1)
   term.2 <- as.big.matrix(term.2)
-  system.time({
   sim <- term.1 %*% term.2
-  })
-  system.time({
   big.recs <- as.big.matrix(apply(sim, 2, function(x.col){
       ind <- generalized.which.max(x.col, n.recs)
       c(ind, x.col[ind])
     }))
-  })
   big.recs.ind <- big.recs[1:n.recs,]
   big.recs.scores <- t(big.recs[(n.recs + 1):nrow(big.recs),])
   big.recs.ind <- apply(big.recs.ind, 1, function(x){
@@ -128,9 +129,16 @@ RecsBM25 <- function(k1, k3, b, n.recs, ids){
   rownames(big.recs.scores) <- ids
   cbind(meltish(big.recs.ind), meltish(big.recs.scores)[,2])
 }
-system.time({
-  recs <- RecsBM25(1.6, 1.6, .25, 50, ids.test)
-})
 
-colnames(recs) <- c("question_id", "user_id", "score")
-write.csv(recs, file = output.path)
+grid.aux <- expand.grid(b = 0.4, k3 = 0.1, k1 = 3)
+for(no.it in 1:nrow(grid.aux)){
+  print(no.it)
+  print(Sys.time())
+  recs <- RecsBM25(grid.aux[no.it,"k1"], grid.aux[no.it,"k3"],
+    grid.aux[no.it,"b"], 50, ids.test)
+  colnames(recs) <- c("question_id", "user_id", "score")
+  output.path <- paste("../data/OneMonthOfThree/Recs/",paste(550, 
+    grid.aux[no.it,"k1"], 
+    grid.aux[no.it,"k3"], grid.aux[no.it,"b"], 50, sep = "_"), ".csv", sep = "")
+  write.csv(recs, file = output.path, row.names = FALSE, quote = FALSE)
+}

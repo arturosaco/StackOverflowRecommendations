@@ -1,15 +1,15 @@
 library(ProjectTemplate)
 load.project()
 
-scores.partial <- read.csv("data/1_500.csv")
-scores.partial.1 <- read.csv("data/501_1000.csv")
-scores.partial.2 <- read.csv("data/1001_1500.csv")
+scores <- read.csv("data/questions.csv")
+scores.odd <- read.csv("data/odd.csv")
+scores.even <- read.csv("data/even.csv")
 
-scores <- rbind(scores.partial, scores.partial.1, scores.partial.2)
-rm(scores.partial, scores.partial.1, scores.partial.2)
+scores <- unique(scores)
 
 scores$answer_body <- as.character(scores$answer_body)
 scores$question_body <- as.character(scores$question_body)
+scores$score <- as.numeric(as.character(scores$score))
 
 # =================
 # = Answer length =
@@ -60,8 +60,6 @@ answ.text <- scores.2[, c("answer_id", "is_accepted", "answ.code", "answ.plain.t
 answ.text.m <- melt(answ.text, id.vars = c("answer_id", "is_accepted"))
 answ.text.m$value <- as.character(answ.text.m$value)
 
-
-
 answ.sum <- dcast(ddply(answ.text.m, c("variable", "is_accepted"), function(sub){
     aux <- summary(nchar(sub$value))
     data.frame(q = names(aux), v = as.numeric(as.character(aux)))
@@ -83,41 +81,165 @@ round(prop.table(table(scores.2$is_accepted, scores.2$answer.has.code), 1) * 100
 
 prop.table(table(scores$is_accepted)) * 100
 
-# ===================
-# = Recommendations =
-# ===================
-
-### take a random subset of 10,000 questions
-
-sub.q.ids <- sample(scores$question_id, 10000)
-scores.sub <- scores[!is.na(scores$answer_owner) & scores$question_id %in%
-  sub.q.ids, 
-   c("question_id", "answer_owner", "is_accepted")]
-
 # ====================
 # = Split train/test =
 # ====================
 
-q.ids <- unique(scores.sub$question_id)
-u.ids <- unique(scores.sub$answer_owner)
+q.ids <- unique(scores.sub.2$index.q)
+u.ids <- unique(scores.sub.2$index.o)
 
-train.q.ids <- sample(q.ids, round(2/3 * length(q.ids)))
+train.q.ids <- sample(1:length(q.ids), round(2/3 * length(q.ids)))
 test.q.ids <- setdiff(q.ids, train.q.ids)
 
-scores.sub$answer_owner <- factor(scores.sub$answer_owner)
-scores.sub$question_id <- factor(scores.sub$question_id)
+mat <- sparseMatrix(i = scores.sub.2$index.q,
+  j = scores.sub.2$index.o,
+  x = scores.sub.2$score.1)
 
-scores.sub$id <- paste(scores.sub$question_id, scores.sub$answer_owner, sep = ".")
-scores.sub$is_accepted <- as.character(scores.sub$is_accepted)
-scores.sub[!is.na(scores.sub$is_accepted) & 
-  scores.sub$is_accepted == "False", "is_accepted"] <- 1
-scores.sub[!is.na(scores.sub$is_accepted) & 
-  scores.sub$is_accepted == "True", "is_accepted"] <- 2
-scores.sub$is_accepted <- as.numeric(scores.sub$is_accepted)
-scores.sub.1 <- scores.sub[!scores.sub$id %in% 
-  names(table(scores.sub$id)[table(scores.sub$id) > 1]), ]
+# ======================
+# = Use recommenderlab =
+# ======================
 
-scores.mat <- acast(scores.sub.1, question_id ~ answer_owner, 
-  value.var = "is_accepted", fill = 0)
+mat.train.r <- new("realRatingMatrix", data = t(mat[train.q.ids, ]))
+mat.test.r <- new("realRatingMatrix", data = mat[test.q.ids, ])
 
-library(recommenderlab)
+rec <- Recommender(mat.train.r,  method = "UBCF")
+recom <- predict(object = rec, newdata = mat.train.r, n = 5, type="topNList")
+
+# ==============
+# = Wordclouds =
+# ==============
+
+library(wordcloud)
+library(stringr)
+
+dat <- read.csv(file = "data/topic-word-weights.50.csv", header = FALSE)
+names(dat) <- c("topic.id", "p.word.g.topic", "word.count", "word")
+dat$word <- str_trim(as.character(dat$word))
+
+
+con <- file("data/topic-keys.50.txt") 
+open(con)
+results.list <- list();
+current.line <- 1
+while (length(line <- readLines(con, n = 1, warn = FALSE)) > 0) {
+    results.list[[current.line]] <- strsplit(line, split = "\\t")
+    current.line <- current.line + 1
+} 
+close(con)
+
+top20w <- ldply(results.list, function(x){
+    data.frame(topic = as.numeric(x[[1]][1]) + 1,
+      weigth = x[[1]][2],
+      word = do.call(c, strsplit(x[[1]][3], split = " ")))
+  })
+
+
+con <- file("data/topics_questions.txt") 
+open(con)
+results.list <- list();
+current.line <- 1
+while (length(line <- readLines(con, n = 1, warn = FALSE)) > 0) {
+   if(length(line)){
+    results.list[[current.line]] <- line
+    current.line <- current.line + 1
+  }
+} 
+close(con)
+
+selected.qs <- ldply(results.list, function(x){
+  aux <- strsplit(gsub("\\s+", " ", x), split = " ")[[1]]
+  cbind(aux[1], aux[-1][1:(length(aux)-1) %% 2 == 1],
+  aux[-1][1:(length(aux)-1) %% 2 == 0])
+  })
+names(selected.qs) <- c("question_id", "topic", "weigth")
+selected.qs$weigth <- as.numeric(as.character(selected.qs$weigth))
+
+top20w$weigth <- as.numeric(as.character(top20w$weigth))
+top20w <- arrange(top20w, weigth, decreasing = T)
+topics.sub <- unique(top20w[,c("topic", "weigth")])[1:10, "topic"]
+
+top20w.sub <- top20w[top20w$topic %in% topics.sub, ]
+cols = data.frame(cols = c("salmon", "deeppink", "darkorange", 
+  "darkgreen", "darkblue",
+  "darkred", "darkcyan", "black", "red", "lightskyblue"), topic = topics.sub)
+top20w.sub.1 <- join(top20w.sub, cols)
+wordcloud(words = top20w.sub.1$word, freq = top20w.sub.1$weigth,
+  colors = as.character(top20w.sub.1$cols),
+  scale=c(1.5,1), random.color=FALSE,
+  random.order = TRUE, ordered.colors = TRUE,
+  rot.per=.3,use.r.layout=FALSE)
+
+
+int.top <- dat[dat$topic.id %in% c(29,36,26,2,33), ]
+cols <- data.frame(cols = c("red", "orange", 
+   "darkgreen", "violet", "navy"), topic.id = c(29,36,26,2,33))
+int.top.1 <- join(int.top, cols)
+int.top.1 <- ddply(int.top.1, "topic.id", transform, 
+  max.top = max(p.word.g.topic))
+png("graphs/word_cloud.png", width = 500, height = 500,
+  bg = "transparent")
+wordcloud(words = int.top.1$word, 
+  freq = int.top.1$p.word.g.topic / int.top.1$max.top,
+  colors = as.character(int.top.1$cols),
+  scale=c(3,.5), random.color=FALSE,
+  random.order = FALSE, ordered.colors = TRUE,
+  rot.per=.3,use.r.layout=FALSE)
+dev.off()
+
+
+
+int.top <- dat[dat$topic.id %in% c(36), ]
+cols <- data.frame(cols = c("darkorange"), topic.id = c(36))
+int.top.1 <- join(int.top, cols)
+int.top.1 <- ddply(int.top.1, "topic.id", transform, 
+  max.top = max(p.word.g.topic))
+png("graphs/word_cloud_36.png", width = 500, height = 500,
+  bg = "transparent")
+wordcloud(words = int.top.1$word, 
+  freq = int.top.1$p.word.g.topic / int.top.1$max.top,
+  colors = as.character(int.top.1$cols),
+  scale=c(3,.5), random.color=FALSE,
+  random.order = FALSE, ordered.colors = TRUE,
+  rot.per=.3,use.r.layout=FALSE)
+dev.off()
+
+png("graphs/word_cloud_29.png", width = 500, height = 500,
+  bg = "transparent")
+int.top <- dat[dat$topic.id %in% c(29), ]
+cols <- data.frame(cols = c("black"), topic.id = c(29))
+int.top.1 <- join(int.top, cols)
+int.top.1 <- ddply(int.top.1, "topic.id", transform, 
+  max.top = max(p.word.g.topic))
+
+wordcloud(words = int.top.1$word, 
+  freq = int.top.1$p.word.g.topic / int.top.1$max.top,
+  colors = as.character(int.top.1$cols),
+  scale=c(3,.5), random.color=FALSE,
+  random.order = FALSE, ordered.colors = TRUE,
+  rot.per=.3,use.r.layout=FALSE)
+dev.off()
+
+
+
+# ======================
+# = Interesting topics =
+# ======================
+
+29
+36
+
+26
+2
+33
+# ==========================
+# = Your Comment Goes here =
+# ==========================
+
+top20w$alpha <- top20w$weigth
+aux <- unique(top20w[,c("topic", "alpha")])
+aux$topic.id <- aux$topic -1
+dat.1 <- join(dat, aux)
+
+aux.2 <- ddply(dat.1, "topic.id", summarise, med = sum(p.word.g.topic), 
+  alpha = unique(alpha))
+ggplot(aux.2, aes(x = alpha, y = med)) + geom_point()
